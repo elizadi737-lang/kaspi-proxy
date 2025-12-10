@@ -1,0 +1,35 @@
+// api/proxy.js
+const fetch = require('node-fetch');
+
+module.exports = async (req, res) => {
+  try {
+    const kaspiBase = 'https://api.kaspi.kz/shop/v1/orders';
+    const qs = Object.keys(req.query)
+      .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(req.query[k])}`)
+      .join('&');
+    const kaspiUrl = qs ? `${kaspiBase}?${qs}` : kaspiBase;
+
+    const KASPI_TOKEN = process.env.KASPI_TOKEN;
+    if (!KASPI_TOKEN) {
+      res.status(500).json({ error: 'KASPI_TOKEN not configured on server' });
+      return;
+    }
+
+    const kaspiRes = await fetch(kaspiUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${KASPI_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const body = await kaspiRes.text();
+    res.status(kaspiRes.status);
+    const ct = kaspiRes.headers.get('content-type') || 'application/json';
+    res.setHeader('content-type', ct);
+    res.send(body);
+  } catch (err) {
+    console.error('Proxy error:', err && (err.stack || err.message || err));
+    res.status(500).json({ error: 'proxy_error', details: err.message || String(err) });
+  }
+};
